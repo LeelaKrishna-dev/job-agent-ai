@@ -2,6 +2,9 @@ package com.example.demo.agent;
 
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -18,12 +21,29 @@ public class JobMatchAgentService {
             "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "in", "is", "it", "of",
             "on", "or", "that", "the", "to", "with", "you", "your", "we", "our", "will", "this", "have"
     );
+    private static final Set<Integer> SUPPORTED_POSTED_WINDOWS = Set.of(1, 4, 24);
+
+    private final Clock clock;
+
+    public JobMatchAgentService() {
+        this(Clock.systemUTC());
+    }
+
+    JobMatchAgentService(Clock clock) {
+        this.clock = clock;
+    }
 
     public AgentResponse runAgent(AgentRequest request) {
         Set<String> resumeKeywords = extractKeywords(request.resume());
         List<MatchedJobResult> matches = new ArrayList<>();
+        int postedWithinHours = resolvePostedWindow(request.postedWithinHours());
+        Instant threshold = Instant.now(clock).minus(postedWithinHours, ChronoUnit.HOURS);
 
         for (JobPosting job : request.jobs()) {
+            if (!isEligible(job, threshold)) {
+                continue;
+            }
+
             Set<String> jdKeywords = extractKeywords(job.description());
             double matchScore = calculateMatchScore(resumeKeywords, jdKeywords);
 
@@ -44,6 +64,24 @@ public class JobMatchAgentService {
         matches.sort(Comparator.comparingDouble(MatchedJobResult::matchScore).reversed());
         String csvReport = buildCsv(matches);
         return new AgentResponse(matches, csvReport);
+    }
+
+    private boolean isEligible(JobPosting job, Instant threshold) {
+        return job.h1bSponsorship()
+                && job.employmentType() == EmploymentType.FULL_TIME
+                && !job.postedAt().isBefore(threshold);
+    }
+
+    private int resolvePostedWindow(Integer requestedHours) {
+        if (requestedHours == null) {
+            return 24;
+        }
+
+        if (!SUPPORTED_POSTED_WINDOWS.contains(requestedHours)) {
+            throw new IllegalArgumentException("postedWithinHours must be one of: 1, 4, 24");
+        }
+
+        return requestedHours;
     }
 
     private Set<String> extractKeywords(String text) {

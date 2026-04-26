@@ -8,6 +8,7 @@ import java.util.List;
 
 public record AgentRequest(
         @NotBlank String resume,
-        @NotEmpty List<@Valid JobPosting> jobs
+        @NotEmpty List<@Valid JobPosting> jobs,
+        Integer postedWithinHours
 ) {
 }
