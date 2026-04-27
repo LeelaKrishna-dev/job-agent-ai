@@ -54,7 +54,7 @@ public class JobBoardFetchService {
     }
 
     Document search(String query) throws IOException {
-        String url = UriComponentsBuilder.fromUriString("https://html.duckduckgo.com/html/")
+        String url = UriComponentsBuilder.fromHttpUrl("https://html.duckduckgo.com/html/")
                 .queryParam("q", query)
                 .build()
                 .toUriString();
